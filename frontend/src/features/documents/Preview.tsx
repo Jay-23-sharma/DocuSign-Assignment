@@ -100,7 +100,9 @@ export function Preview({
     return <Prepare id={id} doc={doc} onDirty={onDirty} />;
   return (
     <section className="preview">
-      <a href="/">Back to documents</a>
+      <a className="document-action-link" href="/">
+        Back to documents
+      </a>
       {error ? (
         <p role="alert">{error}</p>
       ) : !doc ? (
@@ -141,7 +143,7 @@ export function Preview({
           {doc.status !== "draft" && (
             <DeliveryResults id={id} doc={doc} onRefresh={setDoc} />
           )}
-          {editable && <a href={"/documents/" + id + "/prepare"}>Prepare</a>}
+          {editable && <a className="document-action-link" href={"/documents/" + id + "/prepare"}>Prepare</a>}
           {doc.status === "signed" && (
             <section>
               <p>All recipients have signed. The completed PDF is pending.</p>
@@ -153,17 +155,19 @@ export function Preview({
           {completed && (
             <section>
               <h3>Completed PDF</h3>
-              <a
-                href={"/api/documents/" + id + "/files/completed?download=1"}
-                download
-              >
-                Download completed PDF
-              </a>
-              <button onClick={() => setShowOriginal((v) => !v)}>
-                {showOriginal
-                  ? "Preview completed PDF"
-                  : "Preview original PDF"}
-              </button>
+              <div className="pdf-actions">
+                <a
+                  href={"/api/documents/" + id + "/files/completed?download=1"}
+                  download
+                >
+                  Download completed PDF
+                </a>
+                <button onClick={() => setShowOriginal((v) => !v)}>
+                  {showOriginal
+                    ? "Preview completed PDF"
+                    : "Preview original PDF"}
+                </button>
+              </div>
               <p>
                 SHA-256{" "}
                 <code style={{ overflowWrap: "anywhere" }}>

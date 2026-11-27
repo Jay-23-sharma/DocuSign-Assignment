@@ -24,18 +24,27 @@ type Detail struct {
 	Original   *Original   `json:"original"`
 }
 
-func (s Store) List(ctx context.Context, owner int64, query, status string) ([]Summary, error) {
-	rows, err := s.Pool.Query(ctx, `SELECT d.id,d.title,d.status,d.created_at,counts.signed,counts.total FROM documents d
- CROSS JOIN LATERAL (SELECT count(*) FILTER (WHERE r.status='signed') AS signed,count(*) AS total
- FROM recipients r WHERE r.document_id=d.id) counts
- WHERE owner_id=$1 AND strpos(lower(title),lower($2))>0 AND ($3='' OR status=$3)
- ORDER BY created_at DESC,id DESC`, owner, query, status)
+type ListedDocument struct {
+	Summary
+	Owned  bool   `json:"owned"`
+	Sender string `json:"sender"`
+}
+
+func (s Store) List(ctx context.Context, userID int64, email, view, query, status string) ([]ListedDocument, error) {
+	rows, err := s.Pool.Query(ctx, `SELECT d.id,d.title,d.status,d.created_at,counts.signed,counts.total,d.owner_id=$1,u.name
+ FROM documents d JOIN users u ON u.id=d.owner_id
+ CROSS JOIN LATERAL (SELECT count(*) FILTER (WHERE r.status='signed') AS signed,count(*) AS total,
+ bool_or(lower(r.email)=lower($2)) AS addressed FROM recipients r WHERE r.document_id=d.id) counts
+ WHERE ((d.owner_id=$1 AND ($3 IN ('owned','all') OR ($3='sent' AND d.sent_at IS NOT NULL)))
+ OR ($3 IN ('all','received') AND d.sent_at IS NOT NULL AND counts.addressed))
+ AND strpos(lower(d.title),lower($4))>0 AND ($5='' OR d.status=$5)
+ ORDER BY d.created_at DESC,d.id DESC`, userID, email, view, query, status)
 	if err != nil {
 		return nil, err
 	}
-	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (Summary, error) {
-		var d Summary
-		err := row.Scan(&d.ID, &d.Title, &d.Status, &d.CreatedAt, &d.SignedCount, &d.RecipientCount)
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (ListedDocument, error) {
+		var d ListedDocument
+		err := row.Scan(&d.ID, &d.Title, &d.Status, &d.CreatedAt, &d.SignedCount, &d.RecipientCount, &d.Owned, &d.Sender)
 		return d, err
 	})
 }

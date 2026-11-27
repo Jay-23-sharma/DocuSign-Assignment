@@ -76,6 +76,16 @@ export function SenderPage({ documentId, prepare, review }: { documentId?: strin
     setAttempt(value => value + 1);
   }
 
+  const logoutControl = <>
+    {logout === "failed" && <p role="alert">Logout could not be confirmed. Please try again.</p>}
+    <button className="logout-button" disabled={logout === "pending"} onClick={logOut}>
+      {logout === "pending" ? "Logging out…" : logout === "failed" ? "Retry logout" : "Log out"}
+    </button>
+  </>;
+  if (identity.state === "ready" && !documentId) {
+    return <Dashboard name={identity.name} logoutControl={logoutControl} />;
+  }
+
   return <main className={identity.state === "ready" ? "workspace" : undefined}>
     <h1>{identity.state === "ready" ? "Documents" : "Sender account"}</h1>
     <div role="status">
@@ -89,11 +99,8 @@ export function SenderPage({ documentId, prepare, review }: { documentId?: strin
       <a href="/register">Create account</a>
     </nav>}
     {identity.state === "ready" && <>
-      {logout === "failed" && <p role="alert">Logout could not be confirmed. Please try again.</p>}
-      <button disabled={logout === "pending"} onClick={logOut}>
-        {logout === "pending" ? "Logging out…" : logout === "failed" ? "Retry logout" : "Log out"}
-      </button>
-      {documentId ? <Preview key={documentId} id={documentId} prepare={prepare} review={review} onDirty={setDirty} /> : <Dashboard />}
+      {logoutControl}
+      {documentId && <Preview key={documentId} id={documentId} prepare={prepare} review={review} onDirty={setDirty} />}
     </>}
     {identity.state === "error" && <button onClick={retry}>Retry</button>}
   </main>;

@@ -32,7 +32,16 @@ func documentID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 func listDocuments(store documents.Store) senderHandler {
 	return func(w http.ResponseWriter, r *http.Request, s auth.Sender) {
 		filters := r.URL.Query()
-		docs, err := store.List(r.Context(), s.ID, filters.Get("q"), filters.Get("status"))
+		view := filters.Get("view")
+		switch view {
+		case "":
+			view = "owned"
+		case "all", "sent", "received":
+		default:
+			registrationError(w, 400, "Unknown document view.")
+			return
+		}
+		docs, err := store.List(r.Context(), s.ID, s.Email, view, filters.Get("q"), filters.Get("status"))
 		if err != nil {
 			documentError(w, err)
 			return

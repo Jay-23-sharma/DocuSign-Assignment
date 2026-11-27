@@ -107,7 +107,7 @@ export function Prepare({
 
   return (
     <section className="prepare">
-      <a href={"/documents/" + id}>Close editor</a>
+      <a className="document-action-link" href={"/documents/" + id}>Close editor</a>
       <h2>Prepare {doc.title}</h2>
       <div className="layout-actions">
         <button disabled={busy} onClick={saveLayout}>

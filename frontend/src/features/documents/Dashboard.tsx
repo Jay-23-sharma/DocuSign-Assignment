@@ -1,6 +1,6 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type ReactNode, type FormEvent } from "react";
 
-type Summary = { id: number; title: string; status: string; created_at: string; signed_count:number; recipient_count:number };
+type Summary = { id: number; title: string; status: string; created_at: string; owned:boolean; sender:string; signed_count:number; recipient_count:number };
 const statuses = ["draft", "sent", "viewed", "signed", "completed", "declined", "voided", "expired"];
 const label = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
@@ -57,7 +57,12 @@ function UploadForm({ uploaded }: { uploaded: () => void }) {
   </section>;
 }
 
-export function Dashboard() {
+const views = { all: "All documents", sent: "Sent by me", received: "Received by me" } as const;
+type View = keyof typeof views;
+
+export function Dashboard({name, logoutControl}: {name: string; logoutControl: ReactNode}) {
+  const [view, setView] = useState<View>("all");
+  const [uploading, setUploading] = useState(false);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [revision, setRevision] = useState(0);
@@ -69,7 +74,7 @@ export function Dashboard() {
       setList(null);
       setFailed(false);
       try {
-        const params = new URLSearchParams({ q: query, status });
+        const params = new URLSearchParams({ view, q: query, status });
         const response = await fetch("/api/documents?" + params, { signal: controller.signal });
         if (!response.ok) throw new Error("list unavailable");
         const data: Summary[] = await response.json();
@@ -80,12 +85,21 @@ export function Dashboard() {
     }
     void load();
     return () => controller.abort();
-  }, [query, status, revision]);
+  }, [view, query, status, revision]);
 
-  return <div className="document-layout">
-    <UploadForm uploaded={() => { setQuery(""); setStatus(""); setRevision(n => n + 1); }} />
-    <section aria-labelledby="documents-heading">
-      <h2 id="documents-heading">Your documents</h2>
+  return <main className="workspace dashboard">
+    <aside className="dashboard-sidebar">
+      <div className="dashboard-profile"><span aria-hidden="true">{Array.from(name)[0]?.toUpperCase()}</span><strong>{name}</strong></div>
+      <nav aria-label="Document folders">
+        {(Object.keys(views) as View[]).map(key => <button key={key} aria-current={view===key?"page":undefined} onClick={()=>{setList(null);setView(key);if(key===view)setRevision(n=>n+1)}}>{views[key]}</button>)}
+      </nav>
+      <div className="dashboard-account">{logoutControl}</div>
+    </aside>
+    <section className="document-list" aria-labelledby="documents-heading">
+      <div className="document-heading"><h1 id="documents-heading">{views[view]}</h1>
+        <button aria-expanded={uploading} onClick={()=>setUploading(v=>!v)}>{uploading?"Close upload":"Upload a PDF"}</button>
+      </div>
+      {uploading && <UploadForm uploaded={()=>{setUploading(false);setView("all");setQuery("");setStatus("");setRevision(n=>n+1)}}/>}
       <div className="document-filters">
         <label>Search by title<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label>
         <div><label htmlFor="document-status">Status</label><select id="document-status" value={status} onChange={e => setStatus(e.target.value)}>
@@ -96,13 +110,14 @@ export function Dashboard() {
       {failed ? <div role="alert"><p>Documents could not be loaded.</p><button onClick={() => setRevision(n => n + 1)}>Retry</button></div>
         : list === null ? <p role="status">Loading documents…</p>
         : !list.length ? <p role="status">{query || status ? "No matching documents." : "No documents yet."}</p>
-        : <table><thead><tr><th>Title</th><th>Status</th><th>Signatures</th><th>Upload date</th></tr></thead>
+        : <div className="document-table"><table><thead><tr><th>Title</th><th>Sender</th><th>Status</th><th>Signatures</th><th>Upload date</th></tr></thead>
           <tbody>{list.map(doc => <tr key={doc.id}>
-            <td><a href={"/documents/" + doc.id}>{doc.title}</a></td>
-            <td>{label(doc.status)}</td>
+            <td>{doc.owned ? <a href={"/documents/" + doc.id}>{doc.title}</a> : <>{doc.title}{["sent","viewed"].includes(doc.status)&&<small className="invitation-note">Open your email invitation to sign.</small>}</>}</td>
+            <td>{doc.owned?"You":doc.sender}</td>
+            <td><span className="status-pill" data-status={doc.status}>{label(doc.status)}</span></td>
             <td>{doc.status==="draft"?"—":doc.signed_count+" of "+doc.recipient_count}</td>
             <td><time dateTime={doc.created_at}>{new Date(doc.created_at).toLocaleDateString()}</time></td>
-          </tr>)}</tbody></table>}
+          </tr>)}</tbody></table></div>}
     </section>
-  </div>;
+  </main>;
 }
